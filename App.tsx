@@ -11,10 +11,10 @@ import { Sparkles, Loader2, AlertCircle, LogOut, User as UserIcon } from 'lucide
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [sources, setSources] = useState<Record<string, StudySource | null>>({
-    syllabus: null,
-    notes: null,
-    textbook: null
+  const [sources, setSources] = useState<Record<'syllabus' | 'notes' | 'textbook', StudySource[]>>({
+    syllabus: [],
+    notes: [],
+    textbook: []
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [guide, setGuide] = useState<StudyGuideResponse | null>(null);
@@ -25,30 +25,40 @@ const App: React.FC = () => {
     if (activeUser) setUser(activeUser);
   }, []);
 
-  const handleUpload = (source: StudySource) => {
-    setSources(prev => ({ ...prev, [source.id]: source }));
+  const handleAddSource = (source: StudySource) => {
+    setSources(prev => ({
+      ...prev,
+      [source.category]: [...prev[source.category], source]
+    }));
     setError(null);
+  };
+
+  const handleRemoveSource = (category: 'syllabus' | 'notes' | 'textbook', id: string) => {
+    setSources(prev => ({
+      ...prev,
+      [category]: prev[category].filter(s => s.id !== id)
+    }));
   };
 
   const handleLogout = () => {
     authService.logout();
     setUser(null);
     setGuide(null);
-    setSources({ syllabus: null, notes: null, textbook: null });
+    setSources({ syllabus: [], notes: [], textbook: [] });
   };
 
-  const activeSourcesCount = Object.values(sources).filter(Boolean).length;
-  const isReady = activeSourcesCount >= 2;
+  const categoriesWithSources = Object.values(sources).filter(list => list.length > 0).length;
+  const isReady = categoriesWithSources >= 2;
 
   const handleConsultOracle = async () => {
-    const uploadedSources = Object.values(sources).filter((s): s is StudySource => s !== null);
+    const allSources = [...sources.syllabus, ...sources.notes, ...sources.textbook];
     
     setIsAnalyzing(true);
     setError(null);
     setGuide(null);
 
     try {
-      const result = await generateStudyGuide(uploadedSources);
+      const result = await generateStudyGuide(allSources);
       setGuide(result);
       setTimeout(() => {
         document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -77,13 +87,13 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-20 selection:bg-purple-500/30">
       <div className="max-w-6xl mx-auto px-4 pt-6 flex justify-between items-center relative z-50">
-        <div className="flex items-center gap-3 bg-slate-900/40 px-4 py-2 rounded-full border border-slate-800">
+        <div className="flex items-center gap-3 bg-slate-900/40 px-4 py-2 rounded-full border border-slate-800 backdrop-blur-md">
           <UserIcon className="w-4 h-4 text-indigo-400" />
           <span className="text-slate-200 text-sm font-medium">Greetings, {user.name}</span>
         </div>
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
+          className="flex items-center gap-2 text-slate-500 hover:text-white transition-all text-xs font-black uppercase tracking-[0.2em]"
         >
           <LogOut className="w-4 h-4" />
           Leave Temple
@@ -95,27 +105,30 @@ const App: React.FC = () => {
       <main className="max-w-6xl mx-auto px-4">
         {!guide && !isAnalyzing && (
           <>
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <div className="grid md:grid-cols-3 gap-6 mb-16 items-stretch">
               <SourceUpload
-                id="syllabus"
+                category="syllabus"
                 label="Syllabus"
-                description="The path of the course"
-                source={sources.syllabus}
-                onUpload={handleUpload}
+                description="The path mapped out"
+                sources={sources.syllabus}
+                onAdd={handleAddSource}
+                onRemove={(id) => handleRemoveSource('syllabus', id)}
               />
               <SourceUpload
-                id="notes"
+                category="notes"
                 label="Lecture Notes"
                 description="Your personal scribbles"
-                source={sources.notes}
-                onUpload={handleUpload}
+                sources={sources.notes}
+                onAdd={handleAddSource}
+                onRemove={(id) => handleRemoveSource('notes', id)}
               />
               <SourceUpload
-                id="textbook"
-                label="Textbook/Chapter"
-                description="The heavy foundation"
-                source={sources.textbook}
-                onUpload={handleUpload}
+                category="textbook"
+                label="Textbook/Chapters"
+                description="The foundations of truth"
+                sources={sources.textbook}
+                onAdd={handleAddSource}
+                onRemove={(id) => handleRemoveSource('textbook', id)}
               />
             </div>
 
@@ -124,10 +137,10 @@ const App: React.FC = () => {
                 onClick={handleConsultOracle}
                 disabled={!isReady || isAnalyzing}
                 className={`
-                  px-12 py-6 rounded-[2rem] font-black text-2xl transition-all duration-500 flex items-center gap-4 mx-auto
+                  px-14 py-7 rounded-[2.5rem] font-black text-2xl transition-all duration-500 flex items-center gap-4 mx-auto
                   ${isReady && !isAnalyzing
-                    ? 'bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white shadow-[0_20px_50px_rgba(79,70,229,0.3)] hover:shadow-[0_25px_60px_rgba(79,70,229,0.4)] transform hover:-translate-y-2 active:scale-95' 
-                    : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'}
+                    ? 'bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 text-white shadow-[0_20px_50px_rgba(79,70,229,0.4)] hover:shadow-[0_25px_60px_rgba(79,70,229,0.5)] transform hover:-translate-y-2 active:scale-95' 
+                    : 'bg-slate-900/50 text-slate-600 cursor-not-allowed border border-slate-800'}
                 `}
               >
                 {isAnalyzing ? (
@@ -137,14 +150,14 @@ const App: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <Sparkles className={isReady ? "text-amber-300 animate-pulse w-8 h-8" : "w-8 h-8"} />
+                    <Sparkles className={isReady ? "text-amber-300 animate-pulse w-8 h-8" : "w-8 h-8 opacity-20"} />
                     Summon Knowledge
                   </>
                 )}
               </button>
               {!isReady && !isAnalyzing && (
-                <p className="text-slate-500 text-sm mt-6 font-medium italic">
-                  "Present at least two scrolls to begin the ritual of focus."
+                <p className="text-slate-500 text-xs mt-8 font-black uppercase tracking-[0.3em] opacity-60">
+                  "Upload from at least two categories to begin the ritual."
                 </p>
               )}
             </div>
@@ -152,26 +165,26 @@ const App: React.FC = () => {
         )}
 
         {isAnalyzing && (
-          <div className="max-w-md mx-auto text-center py-20 animate-pulse">
-            <div className="w-32 h-32 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-10 border border-indigo-500/20 relative shadow-2xl">
+          <div className="max-w-md mx-auto text-center py-24 animate-in zoom-in duration-500">
+            <div className="w-36 h-36 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-10 border border-indigo-500/20 relative shadow-[0_0_100px_rgba(99,102,241,0.1)]">
               <Loader2 className="w-16 h-16 text-indigo-400 animate-spin" />
-              <div className="absolute inset-0 border-t-4 border-purple-500 rounded-full animate-ping opacity-20" />
+              <div className="absolute inset-0 border-t-4 border-purple-500 rounded-full animate-ping opacity-10" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-4 italic oracle-title">Reading the Overlaps...</h2>
-            <p className="text-slate-400 leading-relaxed text-lg">
-              The Oracle is identifying the patterns within your scrolls. You're doing great, focus on your breath.
+            <h2 className="text-3xl font-bold text-white mb-4 italic oracle-title tracking-widest">Sifting Through the Scrolls...</h2>
+            <p className="text-slate-400 leading-relaxed text-lg font-light">
+              The Oracle is correlating your documents. Just breathe, your mastery is approaching.
             </p>
           </div>
         )}
 
         {error && (
-          <div className="max-w-2xl mx-auto p-8 rounded-[2rem] bg-rose-500/5 border border-rose-500/20 flex items-center gap-6 mb-12 animate-in slide-in-from-top-4">
-            <div className="p-3 bg-rose-500/10 rounded-2xl">
+          <div className="max-w-2xl mx-auto p-8 rounded-[2.5rem] bg-rose-500/5 border border-rose-500/20 flex items-center gap-6 mb-12 animate-in slide-in-from-top-4">
+            <div className="p-4 bg-rose-500/10 rounded-2xl">
               <AlertCircle className="text-rose-400 w-8 h-8 flex-shrink-0" />
             </div>
             <div>
-              <h4 className="text-rose-200 font-bold mb-1">Ritual Interrupted</h4>
-              <p className="text-rose-200/60 text-sm leading-relaxed">{error}</p>
+              <h4 className="text-rose-200 font-black uppercase tracking-widest text-sm mb-1">Ritual Interrupted</h4>
+              <p className="text-rose-200/60 text-sm leading-relaxed font-medium">{error}</p>
             </div>
           </div>
         )}
@@ -181,15 +194,15 @@ const App: React.FC = () => {
             <>
               <StudyGuide 
                 guide={guide} 
-                sources={Object.values(sources).filter((s): s is StudySource => s !== null)} 
+                sources={[...sources.syllabus, ...sources.notes, ...sources.textbook]} 
               />
-              <div className="mt-12 text-center pb-20">
+              <div className="mt-16 text-center pb-24">
                  <button 
                   onClick={() => {
                     setGuide(null);
-                    setSources({ syllabus: null, notes: null, textbook: null });
+                    setSources({ syllabus: [], notes: [], textbook: [] });
                   }}
-                  className="px-10 py-4 rounded-2xl border-2 border-slate-800 text-slate-500 hover:text-white hover:border-slate-600 transition-all text-xs font-black uppercase tracking-[0.3em] shadow-lg"
+                  className="px-12 py-5 rounded-[2rem] border-2 border-slate-800 text-slate-500 hover:text-white hover:border-slate-600 transition-all text-xs font-black uppercase tracking-[0.4em] shadow-xl hover:shadow-white/5"
                 >
                   Start New Session
                 </button>
@@ -200,8 +213,8 @@ const App: React.FC = () => {
       </main>
 
       <div className="fixed inset-0 pointer-events-none -z-20 overflow-hidden">
-        <div className="absolute top-[20%] left-[10%] w-64 h-64 bg-indigo-600/5 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-[10%] right-[5%] w-96 h-96 bg-purple-600/5 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[10%] left-[5%] w-[30rem] h-[30rem] bg-indigo-600/[0.03] rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[5%] right-[2%] w-[40rem] h-[40rem] bg-purple-600/[0.03] rounded-full blur-[150px]"></div>
       </div>
     </div>
   );

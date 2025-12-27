@@ -6,18 +6,15 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `You are the 'Exam Oracle,' a world-class tutor known for empathy and extreme academic precision.
-  Your task is to analyze three specific sources provided by a struggling student:
-  1. A Syllabus
-  2. Handwritten Lecture Notes
-  3. A Textbook Chapter
+  Your task is to analyze multiple sources provided by a student across three categories: Syllabus, Lecture Notes, and Textbook Chapters.
   
-  Find the "Overlap": Identify key academic concepts that appear in at least TWO of these sources. 
+  Find the "Overlap": Identify key academic concepts that appear in at least TWO different categories. 
   Ignore "fluff" (unrelated stories, administration details, general filler).
   
   Tone: Supportive, encouraging, wise, and stress-reducing. Speak directly to the student.
   
-  Sources provided:
-  ${sources.map(s => `- ${s.title} (File: ${s.fileName}, Type: ${s.mimeType})`).join('\n')}
+  Document Manifest:
+  ${sources.map(s => `- Category: ${s.category}, File: ${s.fileName}, Mime: ${s.mimeType}`).join('\n')}
   `;
 
   const parts: any[] = [{ text: prompt }];
@@ -31,9 +28,9 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
           data: base64Data
         }
       });
-      parts.push({ text: `The part above is the ${source.title} (${source.fileName}).` });
+      parts.push({ text: `The document above is from the ${source.category} category. Filename: ${source.fileName}` });
     } else {
-      parts.push({ text: `Content of ${source.title} (${source.fileName}): \n ${source.content}` });
+      parts.push({ text: `Text from ${source.category} (${source.fileName}): \n ${source.content}` });
     }
   }
 
@@ -78,17 +75,16 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
 export const generateQuiz = async (sources: StudySource[], concepts: Concept[], preferredDifficulty: string): Promise<Quiz> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `You are the 'Exam Oracle.' Create a high-quality 15-question interactive quiz to test mastery of the following key concepts: 
+  const prompt = `You are the 'Exam Oracle.' Create a high-quality 15-question interactive quiz based on these sources:
   ${concepts.map(c => c.name).join(', ')}.
   
-  Base the questions strictly on the provided syllabus, notes, and textbook content.
+  Ensure questions check for deep understanding of the overlaps identified.
   Include 15 questions in total.
   Distribution: 5 Easy, 5 Moderate, 5 Difficult. 
-  Ensure questions are varied (application-based, definition-based, and scenario-based).
   
   Format: Multiple choice with 4 options each.
   
-  User's Path Choice: ${preferredDifficulty} (if 'mixed', stick to 5/5/5. If they specifically chose a level, skew 10 questions to that level).
+  User's Path Choice: ${preferredDifficulty}.
   `;
 
   const parts: any[] = [{ text: prompt }];
@@ -96,9 +92,9 @@ export const generateQuiz = async (sources: StudySource[], concepts: Concept[], 
     if (source.type === 'file') {
       const base64Data = source.content.split(',')[1] || source.content;
       parts.push({ inlineData: { mimeType: source.mimeType, data: base64Data } });
-      parts.push({ text: `Content of ${source.title}.` });
+      parts.push({ text: `Context from ${source.category}: ${source.fileName}` });
     } else {
-      parts.push({ text: `Text of ${source.title}: ${source.content}` });
+      parts.push({ text: `Text from ${source.category}: ${source.content}` });
     }
   }
 

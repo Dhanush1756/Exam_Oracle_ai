@@ -6,12 +6,13 @@ export interface User {
 }
 
 export interface StudySource {
-  id: 'syllabus' | 'notes' | 'textbook';
+  id: string; // Unique ID for each file
+  category: 'syllabus' | 'notes' | 'textbook';
   title: string;
   type: 'text' | 'file';
   mimeType: string;
   content: string; // Base64 for files, raw text for 'text' type
-  fileName?: string;
+  fileName: string;
 }
 
 export interface Concept {
