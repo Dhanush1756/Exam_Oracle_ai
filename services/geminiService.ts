@@ -1,20 +1,17 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { StudySource, StudyGuideResponse, Quiz, Concept } from "../types";
+import { StudySource, StudyGuideResponse, Quiz, Concept, ChatMessage } from "../types";
 
 export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyGuideResponse> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `You are the 'Exam Oracle,' a world-class tutor known for empathy and extreme academic precision.
-  Your task is to analyze multiple sources provided by a student across three categories: Syllabus, Lecture Notes, and Textbook Chapters.
+  const prompt = `You are the 'Exam Oracle,' a world-class tutor.
+  Analyze these sources (Syllabus, Notes, Textbook) and find concepts that overlap in at least TWO categories.
   
-  Find the "Overlap": Identify key academic concepts that appear in at least TWO different categories. 
-  Ignore "fluff" (unrelated stories, administration details, general filler).
-  
-  Tone: Supportive, encouraging, wise, and stress-reducing. Speak directly to the student.
+  ALSO: Use your search tool to find 3-5 high-quality, reliable external web references (e.g., Wikipedia, official government legal portals like India Code for IT acts, educational platforms like Khan Academy or Coursera) that provide deeper context for the identified core concepts.
   
   Document Manifest:
-  ${sources.map(s => `- Category: ${s.category}, File: ${s.fileName}, Mime: ${s.mimeType}`).join('\n')}
+  ${sources.map(s => `- Category: ${s.category}, File: ${s.fileName}`).join('\n')}
   `;
 
   const parts: any[] = [{ text: prompt }];
@@ -28,9 +25,9 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
           data: base64Data
         }
       });
-      parts.push({ text: `The document above is from the ${source.category} category. Filename: ${source.fileName}` });
+      parts.push({ text: `Context: ${source.category} category. Filename: ${source.fileName}` });
     } else {
-      parts.push({ text: `Text from ${source.category} (${source.fileName}): \n ${source.content}` });
+      parts.push({ text: `Text content from ${source.category} (${source.fileName}): \n ${source.content}` });
     }
   }
 
@@ -38,6 +35,7 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
     model: 'gemini-3-pro-preview',
     contents: { parts },
     config: {
+      tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -60,9 +58,21 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
             }
           },
           suggestedStudyPlan: { type: Type.ARRAY, items: { type: Type.STRING } },
-          estimatedStudyTime: { type: Type.STRING }
+          estimatedStudyTime: { type: Type.STRING },
+          externalReferences: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                url: { type: Type.STRING },
+                description: { type: Type.STRING }
+              },
+              required: ["title", "url", "description"]
+            }
+          }
         },
-        required: ["guideTitle", "oracleMessage", "highPriorityConcepts", "suggestedStudyPlan", "estimatedStudyTime"]
+        required: ["guideTitle", "oracleMessage", "highPriorityConcepts", "suggestedStudyPlan", "estimatedStudyTime", "externalReferences"]
       }
     }
   });
@@ -72,29 +82,57 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
   return JSON.parse(jsonStr);
 };
 
-export const generateQuiz = async (sources: StudySource[], concepts: Concept[], preferredDifficulty: string): Promise<Quiz> => {
+export const chatWithOracle = async (sources: StudySource[], history: ChatMessage[], message: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `You are the 'Exam Oracle.' Create a high-quality 15-question interactive quiz based on these sources:
-  ${concepts.map(c => c.name).join(', ')}.
-  
-  Ensure questions check for deep understanding of the overlaps identified.
-  Include 15 questions in total.
-  Distribution: 5 Easy, 5 Moderate, 5 Difficult. 
-  
-  Format: Multiple choice with 4 options each.
-  
-  User's Path Choice: ${preferredDifficulty}.
-  `;
+  const parts: any[] = [
+    { text: "You are the 'Exam Oracle' Chatbot. Answer the user's questions strictly based on the provided documents. If the information is not in the documents, use your general knowledge but clearly state that it is supplementary to the provided scrolls. Be helpful, concise, and academic." }
+  ];
 
+  for (const source of sources) {
+    if (source.type === 'file') {
+      const base64Data = source.content.split(',')[1] || source.content;
+      parts.push({
+        inlineData: { mimeType: source.mimeType, data: base64Data }
+      });
+      parts.push({ text: `Provided document category: ${source.category}, filename: ${source.fileName}` });
+    } else {
+      parts.push({ text: `Provided document text (${source.category}): ${source.content}` });
+    }
+  }
+
+  // Add conversation history
+  const chat = ai.chats.create({
+    model: 'gemini-3-pro-preview',
+    config: {
+      systemInstruction: "You are the 'Exam Oracle' Chatbot. You assist students by answering questions about their uploaded study materials (Syllabus, Notes, Textbook). Always be supportive and cite the source if possible (e.g., 'As seen in your notes...')."
+    }
+  });
+
+  // Since we have files, it's better to send the files in the first prompt
+  // For a stateless chat implementation that's easier to manage with the files:
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: [
+      { role: 'user', parts },
+      ...history.map(h => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })),
+      { role: 'user', parts: [{ text: message }] }
+    ]
+  });
+
+  return response.text;
+};
+
+export const generateQuiz = async (sources: StudySource[], concepts: Concept[], preferredDifficulty: string): Promise<Quiz> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `Create a 15-question quiz (5 easy, 5 moderate, 5 hard) based on: ${concepts.map(c => c.name).join(', ')}. Path: ${preferredDifficulty}.`;
   const parts: any[] = [{ text: prompt }];
   for (const source of sources) {
     if (source.type === 'file') {
       const base64Data = source.content.split(',')[1] || source.content;
       parts.push({ inlineData: { mimeType: source.mimeType, data: base64Data } });
-      parts.push({ text: `Context from ${source.category}: ${source.fileName}` });
     } else {
-      parts.push({ text: `Text from ${source.category}: ${source.content}` });
+      parts.push({ text: source.content });
     }
   }
 
@@ -127,7 +165,5 @@ export const generateQuiz = async (sources: StudySource[], concepts: Concept[], 
     }
   });
 
-  const jsonStr = response.text;
-  if (!jsonStr) throw new Error("The Trial could not be prepared.");
-  return JSON.parse(jsonStr);
+  return JSON.parse(response.text || "{}");
 };

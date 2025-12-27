@@ -6,13 +6,19 @@ export interface User {
 }
 
 export interface StudySource {
-  id: string; // Unique ID for each file
+  id: string;
   category: 'syllabus' | 'notes' | 'textbook';
   title: string;
   type: 'text' | 'file';
   mimeType: string;
-  content: string; // Base64 for files, raw text for 'text' type
+  content: string; 
   fileName: string;
+}
+
+export interface Reference {
+  title: string;
+  url: string;
+  description: string;
 }
 
 export interface Concept {
@@ -21,7 +27,7 @@ export interface Concept {
   sourcesFoundIn: string[];
   priorityReasoning: string;
   tips: string;
-  overlapIndex: number; // 1-10 scale of importance
+  overlapIndex: number;
 }
 
 export interface QuizQuestion {
@@ -46,10 +52,16 @@ export interface QuizAttempt {
   timestamp: number;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
 export interface StudyGuideResponse {
   guideTitle: string;
   oracleMessage: string;
   highPriorityConcepts: Concept[];
   suggestedStudyPlan: string[];
   estimatedStudyTime: string;
+  externalReferences: Reference[];
 }

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Brain, Lightbulb, CheckCircle, ListChecks, Clock, Target, Loader2, PlayCircle, ShieldQuestion, Award } from 'lucide-react';
+import { Sparkles, Brain, Lightbulb, CheckCircle, ListChecks, Clock, Target, Loader2, PlayCircle, ShieldQuestion, Award, ExternalLink, Globe } from 'lucide-react';
 import { StudyGuideResponse, StudySource, Quiz, QuizAttempt } from '../types';
 import { generateQuiz } from '../services/geminiService';
 import { authService } from '../services/authService';
@@ -22,7 +22,7 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
 
   useEffect(() => {
     setHistory(authService.getQuizAttempts());
-  }, [quiz]); // Refresh when quiz state changes (closing/opening)
+  }, [quiz]);
 
   const toggleConcept = (name: string) => {
     const next = new Set(completedConcepts);
@@ -90,13 +90,6 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
         </p>
       </section>
 
-      {/* Performance Summary if History exists */}
-      {history.length > 0 && !quiz && (
-        <section className="animate-in fade-in duration-700">
-          <PerformanceGraph attempts={history} />
-        </section>
-      )}
-
       {/* High Priority Concepts */}
       <div className="space-y-6">
         <div className="flex items-center justify-between px-2">
@@ -104,9 +97,6 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
             <Brain className="text-purple-400" />
             Core Overlaps
           </h3>
-          <span className="text-slate-500 text-xs font-medium uppercase tracking-widest">
-            {guide.highPriorityConcepts.length} Concepts Identified
-          </span>
         </div>
         
         <div className="grid gap-6">
@@ -136,30 +126,20 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
                 <div className="flex flex-wrap gap-2">
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-400 text-[10px] font-black rounded-full border border-amber-500/20">
                     <Target className="w-3 h-3" />
-                    FOCUS SCORE: {concept.overlapIndex || (concept.sourcesFoundIn.length * 3 + 4)}
+                    SCORE: {concept.overlapIndex}
                   </div>
-                  {concept.sourcesFoundIn.map((src, i) => (
-                    <span key={i} className="px-3 py-1 bg-indigo-500/10 text-indigo-300 text-[10px] font-bold rounded-full border border-indigo-500/20 uppercase tracking-tighter">
-                      {src}
-                    </span>
-                  ))}
                 </div>
               </div>
               
-              <p className="text-slate-300 mb-8 leading-relaxed text-lg">
-                {concept.description}
-              </p>
+              <p className="text-slate-300 mb-8 leading-relaxed text-lg">{concept.description}</p>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800 group-hover:border-slate-700 transition-colors">
+                <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800">
                   <span className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-500 mb-3 block">Strategy</span>
                   <p className="text-sm text-slate-400 italic leading-relaxed">{concept.priorityReasoning}</p>
                 </div>
-                <div className="bg-amber-500/5 p-5 rounded-2xl border border-amber-500/10 group-hover:border-amber-500/20 transition-colors">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Lightbulb className="w-4 h-4 text-amber-500" />
-                    <span className="text-[10px] uppercase tracking-[0.2em] font-black text-amber-500">The Secret</span>
-                  </div>
+                <div className="bg-amber-500/5 p-5 rounded-2xl border border-amber-500/10">
+                  <span className="text-[10px] uppercase tracking-[0.2em] font-black text-amber-500 mb-3 block">Mnemonic Tip</span>
                   <p className="text-sm text-amber-50/80 font-medium leading-relaxed">{concept.tips}</p>
                 </div>
               </div>
@@ -169,39 +149,62 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
       </div>
 
       {/* Suggested Study Plan */}
-      <section className="glass-card p-10 rounded-[3rem] border border-emerald-500/20 bg-emerald-500/5 shadow-inner">
+      <section className="glass-card p-10 rounded-[3rem] border border-emerald-500/20 bg-emerald-500/5">
         <div className="flex items-center gap-4 mb-8">
-          <div className="p-3 bg-emerald-500/10 rounded-2xl">
-            <ListChecks className="text-emerald-400 w-8 h-8" />
-          </div>
+          <ListChecks className="text-emerald-400 w-8 h-8" />
           <h3 className="text-3xl font-bold text-white">Your Quest Log</h3>
         </div>
         <div className="space-y-6">
           {guide.suggestedStudyPlan.map((step, idx) => (
             <div key={idx} className="flex items-start gap-6 group">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0 flex items-center justify-center text-emerald-400 font-black text-sm shadow-sm transition-transform group-hover:scale-110">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0 flex items-center justify-center text-emerald-400 font-black text-sm">
                 {idx + 1}
               </div>
-              <div className="pt-2 border-b border-white/5 pb-4 flex-1">
-                <p className="text-slate-200 text-lg group-hover:text-white transition-colors">{step}</p>
-              </div>
+              <p className="text-slate-200 text-lg pt-2">{step}</p>
             </div>
           ))}
         </div>
       </section>
 
+      {/* External References - "The Deep Dive" */}
+      {guide.externalReferences && guide.externalReferences.length > 0 && (
+        <section className="glass-card p-10 rounded-[3rem] border border-indigo-500/20">
+          <div className="flex items-center gap-4 mb-8">
+            <Globe className="text-indigo-400 w-8 h-8" />
+            <h3 className="text-3xl font-bold text-white">The Great Library</h3>
+          </div>
+          <div className="grid gap-6">
+            {guide.externalReferences.map((ref, idx) => (
+              <a 
+                key={idx} 
+                href={ref.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="group flex items-start gap-6 p-6 rounded-3xl bg-slate-900/50 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800 transition-all"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <ExternalLink className="text-indigo-400 w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-indigo-200 font-bold text-lg mb-1 group-hover:text-indigo-100">{ref.title}</h4>
+                  <p className="text-slate-400 text-sm leading-relaxed mb-2">{ref.description}</p>
+                  <span className="text-[10px] text-indigo-400/60 font-black uppercase tracking-widest">{new URL(ref.url).hostname}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Quiz Section */}
       <div id="quiz-portal" className="pt-20">
         {!quiz && !isGeneratingQuiz ? (
-          <section className="glass-card p-12 rounded-[3rem] border border-indigo-500/20 text-center shadow-2xl bg-gradient-to-b from-transparent to-indigo-900/10">
-            <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/30">
-              <ShieldQuestion className="text-indigo-400 w-10 h-10" />
-            </div>
+          <section className="glass-card p-12 rounded-[3rem] border border-indigo-500/20 text-center shadow-2xl">
+            <ShieldQuestion className="text-indigo-400 w-12 h-12 mx-auto mb-6" />
             <h3 className="oracle-title text-4xl text-white mb-4">The Trial of Mastery</h3>
             <p className="text-slate-400 max-w-lg mx-auto mb-10 text-lg">
-              "When you have finished meditating on the scrolls, let us test your wisdom with 15 trials based on the core overlaps."
+              "Test your wisdom with 15 trials based on the core overlaps."
             </p>
-
             <div className="flex flex-wrap justify-center gap-3 mb-10">
               {(['mixed', 'easy', 'moderate', 'difficult'] as const).map(level => (
                 <button
@@ -210,17 +213,16 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
                   className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all border ${
                     preferredDifficulty === level 
                     ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
-                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500'
+                    : 'bg-slate-900 border-slate-700 text-slate-500'
                   }`}
                 >
                   {level} Path
                 </button>
               ))}
             </div>
-
             <button
               onClick={handleStartQuiz}
-              className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-xl rounded-2xl flex items-center justify-center gap-3 mx-auto hover:from-indigo-500 hover:to-purple-500 transition-all shadow-xl shadow-indigo-500/20 transform hover:-translate-y-1 active:scale-95"
+              className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-xl rounded-2xl flex items-center justify-center gap-3 mx-auto"
             >
               <PlayCircle className="w-6 h-6" />
               Begin the Trial
@@ -229,22 +231,11 @@ const StudyGuide: React.FC<StudyGuideProps> = ({ guide, sources }) => {
         ) : isGeneratingQuiz ? (
           <div className="text-center py-20 animate-pulse">
             <Loader2 className="w-12 h-12 text-indigo-400 animate-spin mx-auto mb-6" />
-            <h3 className="oracle-title text-2xl text-white mb-2">Preparing the Ritual...</h3>
-            <p className="text-slate-500">The Oracle is extracting questions from your scrolls.</p>
+            <h3 className="oracle-title text-2xl text-white">Preparing the Ritual...</h3>
           </div>
         ) : (
           quiz && <QuizComponent quiz={quiz} onClose={() => setQuiz(null)} />
         )}
-      </div>
-
-      <div className="text-center py-20 border-t border-white/5">
-        <button 
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="group px-8 py-4 bg-slate-900 border border-slate-700 rounded-2xl text-slate-400 hover:text-white hover:border-indigo-500 transition-all text-sm uppercase tracking-widest font-bold flex items-center gap-3 mx-auto shadow-xl"
-        >
-          <Target className="w-5 h-5 group-hover:animate-ping" />
-          Back to Altar
-        </button>
       </div>
     </div>
   );

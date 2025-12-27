@@ -3,14 +3,17 @@ import React, { useState, useEffect } from 'react';
 import OracleHeader from './components/OracleHeader';
 import SourceUpload from './components/SourceUpload';
 import StudyGuide from './components/StudyGuide';
+import ProfilePage from './components/ProfilePage';
+import ChatBot from './components/ChatBot';
 import { AuthForms } from './components/AuthForms';
 import { StudySource, StudyGuideResponse, User } from './types';
 import { generateStudyGuide } from './services/geminiService';
 import { authService } from './services/authService';
-import { Sparkles, Loader2, AlertCircle, LogOut, User as UserIcon } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, LogOut, User as UserIcon, Settings } from 'lucide-react';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [view, setView] = useState<'home' | 'profile'>('home');
   const [sources, setSources] = useState<Record<'syllabus' | 'notes' | 'textbook', StudySource[]>>({
     syllabus: [],
     notes: [],
@@ -44,15 +47,15 @@ const App: React.FC = () => {
     authService.logout();
     setUser(null);
     setGuide(null);
+    setView('home');
     setSources({ syllabus: [], notes: [], textbook: [] });
   };
 
+  const allSources = [...sources.syllabus, ...sources.notes, ...sources.textbook];
   const categoriesWithSources = Object.values(sources).filter(list => list.length > 0).length;
   const isReady = categoriesWithSources >= 2;
 
   const handleConsultOracle = async () => {
-    const allSources = [...sources.syllabus, ...sources.notes, ...sources.textbook];
-    
     setIsAnalyzing(true);
     setError(null);
     setGuide(null);
@@ -65,7 +68,7 @@ const App: React.FC = () => {
       }, 100);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "The celestial connection was interrupted. Please try again.");
+      setError(err.message || "The celestial connection was interrupted.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -76,21 +79,29 @@ const App: React.FC = () => {
       <div className="min-h-screen pb-20 selection:bg-purple-500/30">
         <OracleHeader />
         <AuthForms onAuthSuccess={setUser} />
-        <div className="fixed inset-0 pointer-events-none -z-20 overflow-hidden">
-          <div className="absolute top-[20%] left-[10%] w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[10%] right-[5%] w-96 h-96 bg-purple-600/10 rounded-full blur-[120px]"></div>
-        </div>
       </div>
     );
+  }
+
+  if (view === 'profile') {
+    return <ProfilePage user={user} onBack={() => setView('home')} />;
   }
 
   return (
     <div className="min-h-screen pb-20 selection:bg-purple-500/30">
       <div className="max-w-6xl mx-auto px-4 pt-6 flex justify-between items-center relative z-50">
-        <div className="flex items-center gap-3 bg-slate-900/40 px-4 py-2 rounded-full border border-slate-800 backdrop-blur-md">
-          <UserIcon className="w-4 h-4 text-indigo-400" />
-          <span className="text-slate-200 text-sm font-medium">Greetings, {user.name}</span>
-        </div>
+        <button 
+          onClick={() => setView('profile')}
+          className="flex items-center gap-3 bg-slate-900/40 px-4 py-2 rounded-full border border-slate-800 backdrop-blur-md hover:border-indigo-500/50 transition-all group"
+        >
+          <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+            <UserIcon className="w-4 h-4" />
+          </div>
+          <div className="text-left">
+            <span className="text-slate-200 text-xs font-black uppercase block tracking-tighter">Academic Profile</span>
+            <span className="text-slate-400 text-[10px] font-bold">Greetings, {user.name}</span>
+          </div>
+        </button>
         <button 
           onClick={handleLogout}
           className="flex items-center gap-2 text-slate-500 hover:text-white transition-all text-xs font-black uppercase tracking-[0.2em]"
@@ -155,7 +166,7 @@ const App: React.FC = () => {
                   </>
                 )}
               </button>
-              {!isReady && !isAnalyzing && (
+              {!isReady && (
                 <p className="text-slate-500 text-xs mt-8 font-black uppercase tracking-[0.3em] opacity-60">
                   "Upload from at least two categories to begin the ritual."
                 </p>
@@ -166,43 +177,29 @@ const App: React.FC = () => {
 
         {isAnalyzing && (
           <div className="max-w-md mx-auto text-center py-24 animate-in zoom-in duration-500">
-            <div className="w-36 h-36 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-10 border border-indigo-500/20 relative shadow-[0_0_100px_rgba(99,102,241,0.1)]">
-              <Loader2 className="w-16 h-16 text-indigo-400 animate-spin" />
-              <div className="absolute inset-0 border-t-4 border-purple-500 rounded-full animate-ping opacity-10" />
-            </div>
+            <Loader2 className="w-16 h-16 text-indigo-400 animate-spin mx-auto mb-10" />
             <h2 className="text-3xl font-bold text-white mb-4 italic oracle-title tracking-widest">Sifting Through the Scrolls...</h2>
-            <p className="text-slate-400 leading-relaxed text-lg font-light">
-              The Oracle is correlating your documents. Just breathe, your mastery is approaching.
-            </p>
           </div>
         )}
 
         {error && (
-          <div className="max-w-2xl mx-auto p-8 rounded-[2.5rem] bg-rose-500/5 border border-rose-500/20 flex items-center gap-6 mb-12 animate-in slide-in-from-top-4">
-            <div className="p-4 bg-rose-500/10 rounded-2xl">
-              <AlertCircle className="text-rose-400 w-8 h-8 flex-shrink-0" />
-            </div>
-            <div>
-              <h4 className="text-rose-200 font-black uppercase tracking-widest text-sm mb-1">Ritual Interrupted</h4>
-              <p className="text-rose-200/60 text-sm leading-relaxed font-medium">{error}</p>
-            </div>
+          <div className="max-w-2xl mx-auto p-8 rounded-[2.5rem] bg-rose-500/5 border border-rose-500/20 flex items-center gap-6 mb-12">
+            <AlertCircle className="text-rose-400 w-8 h-8 flex-shrink-0" />
+            <p className="text-rose-200/60 text-sm leading-relaxed font-medium">{error}</p>
           </div>
         )}
 
         <div id="results-section">
           {guide && (
             <>
-              <StudyGuide 
-                guide={guide} 
-                sources={[...sources.syllabus, ...sources.notes, ...sources.textbook]} 
-              />
+              <StudyGuide guide={guide} sources={allSources} />
               <div className="mt-16 text-center pb-24">
                  <button 
                   onClick={() => {
                     setGuide(null);
                     setSources({ syllabus: [], notes: [], textbook: [] });
                   }}
-                  className="px-12 py-5 rounded-[2rem] border-2 border-slate-800 text-slate-500 hover:text-white hover:border-slate-600 transition-all text-xs font-black uppercase tracking-[0.4em] shadow-xl hover:shadow-white/5"
+                  className="px-12 py-5 rounded-[2rem] border-2 border-slate-800 text-slate-500 hover:text-white hover:border-slate-600 transition-all text-xs font-black uppercase tracking-[0.4em]"
                 >
                   Start New Session
                 </button>
@@ -211,6 +208,9 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Floating ChatBot - Available once any documents are uploaded */}
+      {allSources.length > 0 && <ChatBot sources={allSources} />}
 
       <div className="fixed inset-0 pointer-events-none -z-20 overflow-hidden">
         <div className="absolute top-[10%] left-[5%] w-[30rem] h-[30rem] bg-indigo-600/[0.03] rounded-full blur-[120px]"></div>
