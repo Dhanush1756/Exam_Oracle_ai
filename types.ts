@@ -3,6 +3,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  friends?: string[]; // Array of friend user IDs
 }
 
 export interface StudySource {
@@ -30,6 +31,13 @@ export interface Concept {
   overlapIndex: number;
 }
 
+export interface SimplifiedExplanation {
+  conceptName: string;
+  simpleDefinition: string;
+  analogy: string;
+  realWorldExample: string;
+}
+
 export interface QuizQuestion {
   question: string;
   options: string[];
@@ -41,15 +49,21 @@ export interface QuizQuestion {
 export interface Quiz {
   title: string;
   questions: QuizQuestion[];
+  isCollaborative?: boolean;
+  sessionId?: string;
 }
 
 export interface QuizAttempt {
   id: string;
+  userId: string;
+  userName: string;
   quizTitle: string;
   score: number;
   total: number;
   percentage: number;
+  timeTaken: number; // in seconds
   timestamp: number;
+  sessionId?: string;
 }
 
 export interface ChatMessage {

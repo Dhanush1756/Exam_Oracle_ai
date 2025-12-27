@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { StudySource, StudyGuideResponse, Quiz, Concept, ChatMessage } from "../types";
+import { StudySource, StudyGuideResponse, Quiz, Concept, ChatMessage, SimplifiedExplanation } from "../types";
 
 export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyGuideResponse> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -82,6 +82,56 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
   return JSON.parse(jsonStr);
 };
 
+export const generateSimpleExplanations = async (concepts: Concept[], sources: StudySource[]): Promise<SimplifiedExplanation[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `You are the 'Exam Oracle.' Your job is to take complex academic concepts and explain them in "Plain English" so anyone could understand them immediately.
+  
+  For each concept provided:
+  1. Define it in extremely simple, jargon-free English. Avoid long sentences.
+  2. Provide a creative Analogy that uses a common household object or activity.
+  3. Provide a Modern, Real-Time Real-World Example (e.g., if it's Law, mention a famous case or common scenario; if it's Tech, mention an app people use).
+  
+  Concepts to simplify based on the uploaded documents:
+  ${concepts.map(c => c.name).join(', ')}
+  `;
+
+  const parts: any[] = [{ text: prompt }];
+  // Add context from sources for better grounding
+  for (const source of sources.slice(0, 5)) {
+    if (source.type === 'file') {
+      const base64Data = source.content.split(',')[1] || source.content;
+      parts.push({ inlineData: { mimeType: source.mimeType, data: base64Data } });
+    } else {
+      parts.push({ text: source.content });
+    }
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            conceptName: { type: Type.STRING },
+            simpleDefinition: { type: Type.STRING },
+            analogy: { type: Type.STRING },
+            realWorldExample: { type: Type.STRING }
+          },
+          required: ["conceptName", "simpleDefinition", "analogy", "realWorldExample"]
+        }
+      }
+    }
+  });
+
+  const result = JSON.parse(response.text || "[]");
+  return result;
+};
+
 export const chatWithOracle = async (sources: StudySource[], history: ChatMessage[], message: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
@@ -101,16 +151,6 @@ export const chatWithOracle = async (sources: StudySource[], history: ChatMessag
     }
   }
 
-  // Add conversation history
-  const chat = ai.chats.create({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction: "You are the 'Exam Oracle' Chatbot. You assist students by answering questions about their uploaded study materials (Syllabus, Notes, Textbook). Always be supportive and cite the source if possible (e.g., 'As seen in your notes...')."
-    }
-  });
-
-  // Since we have files, it's better to send the files in the first prompt
-  // For a stateless chat implementation that's easier to manage with the files:
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: [
