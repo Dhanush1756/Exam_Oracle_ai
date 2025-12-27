@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { StudySource, StudyGuideResponse } from "../types";
+import { StudySource, StudyGuideResponse, Quiz, Concept } from "../types";
 
 export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyGuideResponse> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -20,12 +20,10 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
   ${sources.map(s => `- ${s.title} (File: ${s.fileName}, Type: ${s.mimeType})`).join('\n')}
   `;
 
-  // Construct parts for Gemini
   const parts: any[] = [{ text: prompt }];
   
   for (const source of sources) {
     if (source.type === 'file') {
-      // For files (Images, PDFs), content is a data URL
       const base64Data = source.content.split(',')[1] || source.content;
       parts.push({
         inlineData: {
@@ -35,7 +33,6 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
       });
       parts.push({ text: `The part above is the ${source.title} (${source.fileName}).` });
     } else {
-      // For plain text files
       parts.push({ text: `Content of ${source.title} (${source.fileName}): \n ${source.content}` });
     }
   }
@@ -49,7 +46,7 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
         type: Type.OBJECT,
         properties: {
           guideTitle: { type: Type.STRING },
-          oracleMessage: { type: Type.STRING, description: "A supportive message to reduce anxiety" },
+          oracleMessage: { type: Type.STRING },
           highPriorityConcepts: {
             type: Type.ARRAY,
             items: {
@@ -57,23 +54,15 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
               properties: {
                 name: { type: Type.STRING },
                 description: { type: Type.STRING },
-                sourcesFoundIn: { 
-                    type: Type.ARRAY, 
-                    items: { type: Type.STRING },
-                    description: "List of sources where this concept was found (e.g. Syllabus, Notes)"
-                },
-                priorityReasoning: { type: Type.STRING, description: "Why this is high priority based on overlaps" },
-                tips: { type: Type.STRING, description: "Short mnemonic or study tip" },
-                overlapIndex: { type: Type.NUMBER, description: "Importance score 1-10" }
+                sourcesFoundIn: { type: Type.ARRAY, items: { type: Type.STRING } },
+                priorityReasoning: { type: Type.STRING },
+                tips: { type: Type.STRING },
+                overlapIndex: { type: Type.NUMBER }
               },
               required: ["name", "description", "sourcesFoundIn", "priorityReasoning"]
             }
           },
-          suggestedStudyPlan: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "Step-by-step study sequence"
-          },
+          suggestedStudyPlan: { type: Type.ARRAY, items: { type: Type.STRING } },
           estimatedStudyTime: { type: Type.STRING }
         },
         required: ["guideTitle", "oracleMessage", "highPriorityConcepts", "suggestedStudyPlan", "estimatedStudyTime"]
@@ -82,7 +71,67 @@ export const generateStudyGuide = async (sources: StudySource[]): Promise<StudyG
   });
 
   const jsonStr = response.text;
-  if (!jsonStr) throw new Error("The Oracle remained silent. Please try again.");
+  if (!jsonStr) throw new Error("The Oracle remained silent.");
+  return JSON.parse(jsonStr);
+};
+
+export const generateQuiz = async (sources: StudySource[], concepts: Concept[], preferredDifficulty: string): Promise<Quiz> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
+  const prompt = `You are the 'Exam Oracle.' Create a high-quality 15-question interactive quiz to test mastery of the following key concepts: 
+  ${concepts.map(c => c.name).join(', ')}.
+  
+  Base the questions strictly on the provided syllabus, notes, and textbook content.
+  Include 15 questions in total.
+  Distribution: 5 Easy, 5 Moderate, 5 Difficult. 
+  Ensure questions are varied (application-based, definition-based, and scenario-based).
+  
+  Format: Multiple choice with 4 options each.
+  
+  User's Path Choice: ${preferredDifficulty} (if 'mixed', stick to 5/5/5. If they specifically chose a level, skew 10 questions to that level).
+  `;
+
+  const parts: any[] = [{ text: prompt }];
+  for (const source of sources) {
+    if (source.type === 'file') {
+      const base64Data = source.content.split(',')[1] || source.content;
+      parts.push({ inlineData: { mimeType: source.mimeType, data: base64Data } });
+      parts.push({ text: `Content of ${source.title}.` });
+    } else {
+      parts.push({ text: `Text of ${source.title}: ${source.content}` });
+    }
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          questions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                correctOptionIndex: { type: Type.NUMBER },
+                explanation: { type: Type.STRING },
+                difficulty: { type: Type.STRING, enum: ["easy", "moderate", "difficult"] }
+              },
+              required: ["question", "options", "correctOptionIndex", "explanation", "difficulty"]
+            }
+          }
+        },
+        required: ["title", "questions"]
+      }
+    }
+  });
+
+  const jsonStr = response.text;
+  if (!jsonStr) throw new Error("The Trial could not be prepared.");
   return JSON.parse(jsonStr);
 };

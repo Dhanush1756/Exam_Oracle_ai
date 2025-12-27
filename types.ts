@@ -23,6 +23,28 @@ export interface Concept {
   overlapIndex: number; // 1-10 scale of importance
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation: string;
+  difficulty: 'easy' | 'moderate' | 'difficult';
+}
+
+export interface Quiz {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizAttempt {
+  id: string;
+  quizTitle: string;
+  score: number;
+  total: number;
+  percentage: number;
+  timestamp: number;
+}
+
 export interface StudyGuideResponse {
   guideTitle: string;
   oracleMessage: string;

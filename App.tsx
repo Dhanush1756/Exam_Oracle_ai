@@ -179,7 +179,10 @@ const App: React.FC = () => {
         <div id="results-section">
           {guide && (
             <>
-              <StudyGuide guide={guide} />
+              <StudyGuide 
+                guide={guide} 
+                sources={Object.values(sources).filter((s): s is StudySource => s !== null)} 
+              />
               <div className="mt-12 text-center pb-20">
                  <button 
                   onClick={() => {
